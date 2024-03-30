@@ -1,4 +1,4 @@
-target("main")
+target("opacity")
     set_toolchains("msvc")
     set_kind("binary")
     add_files("main.cpp")
