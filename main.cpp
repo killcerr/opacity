@@ -38,6 +38,37 @@ std::wstring get_window_process_image_name(HWND window) {
     return L"";
   path.resize(len);
   CloseHandle(process);
+  if (path == L"C:\\Windows\\System32\\ApplicationFrameHost.exe") {
+    std::wstring res;
+    EnumChildWindows(
+        window,
+        [](HWND window, LPARAM res) -> int {
+          DWORD pid = -1;
+          GetWindowThreadProcessId(window, &pid);
+          if (pid == -1)
+            return TRUE;
+          auto process = OpenProcess(
+              PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, TRUE, pid);
+          if (process == INVALID_HANDLE_VALUE)
+            return TRUE;
+          std::wstring path;
+          path.resize(MAX_PATH);
+          DWORD len = MAX_PATH;
+          if (QueryFullProcessImageNameW(process, 0, path.data(), &len) == 0)
+            return TRUE;
+          path.resize(len);
+          CloseHandle(process);
+          if (path != L"C:\\Windows\\System32\\ApplicationFrameHost.exe") {
+            *((std::wstring *)res) = path;
+            return FALSE;
+          }
+          return TRUE;
+        },
+        (LPARAM)&res);
+    return res == L"" ? L"C:\\Windows\\System32\\ApplicationFrameHost.exe"
+                      : L"C:\\Windows\\System32\\ApplicationFrameHost.exe(" +
+                            res + L")";
+  }
   return path;
 }
 
@@ -86,6 +117,7 @@ void set_opacity(HWND window, BYTE alpha) {
 } // namespace window_utils
 std::vector<std::pair<std::wstring, BYTE>> names;
 void init_config() {
+  std::wcout << "init config\n";
   if (!std::filesystem::exists("./config.txt")) {
     std::ofstream config("./config.txt");
     config << "";
@@ -100,6 +132,7 @@ void init_config() {
   }
 }
 void init_commandline(int argc, char **argv) {
+  std::wcout << "init commandline\n";
   bool is_name = true;
   for (int i = 1; i < argc; i++) {
     if (is_name) {
