@@ -7,7 +7,8 @@
 ```
 ## example:
 ```
-./opacity.exe C:\Windows\System32\ApplicationFrameHost.exe 80
+./opacity.exe C:\Windows\System32\ApplicationFrameHost.exe
+80
 ```
 # config.txt
 ```
