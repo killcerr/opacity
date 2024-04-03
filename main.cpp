@@ -1,4 +1,5 @@
 #pragma comment(lib, "User32.lib")
+#define NOMINMAX
 #include <Windows.h>
 #include <codecvt>
 #include <filesystem>
@@ -8,10 +9,6 @@
 #include <vector>
 
 namespace window_utils {
-inline std::wstring to_wstring(const std::string &input) {
-  std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-  return converter.from_bytes(input);
-}
 std::vector<HWND> get_all_windows() {
   std::vector<HWND> windows;
   EnumWindows(
@@ -20,6 +17,8 @@ std::vector<HWND> get_all_windows() {
         return TRUE;
       },
       (LPARAM)&windows);
+  std::sort(windows.begin(), windows.end());
+  windows.erase(std::unique(windows.begin(), windows.end()), windows.end());
   return windows;
 }
 std::wstring get_window_process_image_name(HWND window) {
@@ -76,9 +75,10 @@ std::wstring get_window_title(HWND window) {
   auto len = 1024;
   std::wstring title;
   title.resize(len);
-  if (len = GetWindowTextW(window, title.data(), len) == 0)
+  len = GetWindowTextW(window, title.data(), len);
+  if (len == 0)
     return L"";
-  title.resize(len);
+  title.resize(std::max(len, 0));
   if (len <= 1024)
     return title;
   else {
@@ -131,18 +131,19 @@ void init_config() {
     names.push_back({line, std::stoi(alpha)});
   }
 }
-void init_commandline(int argc, char **argv) {
+void init_commandline(int argc, wchar_t const *argv[]) {
   std::wcout << "init commandline\n";
   bool is_name = true;
   for (int i = 1; i < argc; i++) {
     if (is_name) {
-      names.push_back(
-          {window_utils::to_wstring(argv[i]), std::stoi(argv[i + 1])});
+      names.push_back({argv[i], std::stoi(argv[i + 1])});
     }
     is_name = !is_name;
   }
 }
 void apply_opacity() {
+  if (names.size() == 0)
+    return;
   for (auto h : window_utils::get_all_windows()) {
     for (auto [name, v] : names) {
       if ((name == L"*" || window_utils::get_window_class_name(h) == name ||
@@ -157,11 +158,13 @@ void apply_opacity() {
     }
   }
 }
-int main(int argc, char **argv) {
+
+int wmain(int argc, wchar_t const *argv[]) {
   for (auto h : window_utils::get_all_windows()) {
     std::wcout << "class name:" << window_utils::get_window_class_name(h);
     std::wcout << " ";
     std::wcout << "title:" << window_utils::get_window_title(h);
+    std::wcout.clear();
     std::wcout << " ";
     std::wcout << "image name:"
                << window_utils::get_window_process_image_name(h);
@@ -173,4 +176,6 @@ int main(int argc, char **argv) {
   init_config();
   init_commandline(argc, argv);
   apply_opacity();
+
+  return 0;
 }
