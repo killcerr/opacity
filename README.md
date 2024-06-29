@@ -19,3 +19,6 @@ C:\Windows\System32\ApplicationFrameHost.exe 80
 Download from [releases](https://github.com/killcerr/opacity/releases).\
 Add it to PATH.
 
+
+
+![screen shoot](https://github.com/killcerr/opacity/assets/93478098/bddc52c8-26b2-4a78-a86d-385904d8a965)
