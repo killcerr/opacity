@@ -8,6 +8,7 @@
 #include <iostream>
 #include <regex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -123,8 +124,8 @@ void set_opacity(HWND window, BYTE alpha) {
 BYTE get_opacity(HWND window) {
     COLORREF key;
     BYTE     alpha;
-    DWORD    falgs;
-    if (GetLayeredWindowAttributes(window, &key, &alpha, &falgs) == 0) return 255;
+    DWORD    flags;
+    if (GetLayeredWindowAttributes(window, &key, &alpha, &flags) == 0) return 255;
     return alpha;
 }
 
@@ -164,6 +165,7 @@ void init_commandline(int argc, wchar_t const* argv[]) {
     std::wcout << "init commandline\n";
     bool is_name = true;
     for (int i = 1; i < argc; i++) {
+        if (argv[i][0] == L'-') continue;
         if (is_name) {
             names.push_back({argv[i], std::stoi(argv[i + 1])});
         }
@@ -187,7 +189,7 @@ void apply_opacity() {
 }
 
 void init_imgui() {
-    glfwSetErrorCallback([](auto error, auto desc) { std::cerr << "error:" << error << "desc:" << desc << std::endl; });
+    glfwSetErrorCallback([](auto error, auto desc) { std::cerr << "error:" << error << "\ndesc:" << desc << std::endl; });
     if (!glfwInit()) std::terminate();
     const char* glsl_ver = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -204,7 +206,6 @@ void init_imgui() {
     ImGui_ImplOpenGL3_Init();
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -256,7 +257,14 @@ void init_imgui() {
 
                 return false;
             };
-            for (auto h : window_utils::get_all_windows()) {
+            auto sorted = [] {
+                auto res = window_utils::get_all_windows();
+                std::sort(res.begin(), res.end(), [](const auto& a, const auto& b) {
+                    return window_utils::get_window_process_image_name(a) < window_utils::get_window_process_image_name(b);
+                });
+                return res;
+            }();
+            for (auto h : sorted) {
                 if (search[0] != '\0' && !match(h)) continue;
                 ImGui::Text("class name:%ws", window_utils::get_window_class_name(h).c_str());
                 ImGui::SameLine();
@@ -288,30 +296,44 @@ void init_imgui() {
         );
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
         glfwSwapBuffers(window);
+
+        static auto current_window_handle = []() -> HWND {
+            for (auto h : window_utils::get_all_windows()) {
+                if (window_utils::get_window_pid(h) == GetCurrentProcessId()
+                    && window_utils::get_window_title(h) == L"opacity") {
+                    return h;
+                }
+            }
+            return nullptr;
+        }();
+        using namespace std::chrono_literals;
+        if (current_window_handle && !IsWindowVisible(current_window_handle)) {
+            std::this_thread::sleep_for(500ms);
+        }
     }
 }
 
 int wmain(int argc, wchar_t const* argv[]) {
-    for (auto h : window_utils::get_all_windows()) {
-        std::wcout << "class name:" << window_utils::get_window_class_name(h);
-        std::wcout << " ";
-        std::wcout << "title:" << window_utils::get_window_title(h);
-        std::wcout.clear();
-        std::wcout << " ";
-        std::wcout << "image name:" << window_utils::get_window_process_image_name(h);
-        std::wcout << " ";
-        std::wcout << "pid:" << window_utils::get_window_pid(h);
-        std::wcout << " ";
-        std::wcout << "alpha:" << window_utils::get_opacity(h);
-        std::wcout << "\n";
-    }
+    opt_helper::Parser parser{argc, argv};
+    if (!parser.exist<CTC::CTStr{L"--no_info_all_windows"}>())
+        for (auto h : window_utils::get_all_windows()) {
+            std::wcout << "class name:" << window_utils::get_window_class_name(h);
+            std::wcout << " ";
+            std::wcout << "title:" << window_utils::get_window_title(h);
+            std::wcout.clear();
+            std::wcout << " ";
+            std::wcout << "image name:" << window_utils::get_window_process_image_name(h);
+            std::wcout << " ";
+            std::wcout << "pid:" << window_utils::get_window_pid(h);
+            std::wcout << " ";
+            std::wcout << "alpha:" << window_utils::get_opacity(h);
+            std::wcout << "\n";
+        }
 
     init_config();
     init_commandline(argc, argv);
     apply_opacity();
-    opt_helper::Parser parser{argc, argv};
     if (!parser.exist<CTC::CTStr{L"--no_gui"}>()) init_imgui();
     return 0;
 }
