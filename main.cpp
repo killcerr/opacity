@@ -124,7 +124,7 @@ BYTE get_opacity(HWND window) {
     COLORREF key;
     BYTE     alpha;
     DWORD    falgs;
-    GetLayeredWindowAttributes(window, &key, &alpha, &falgs);
+    if (GetLayeredWindowAttributes(window, &key, &alpha, &falgs) == 0) return 255;
     return alpha;
 }
 
