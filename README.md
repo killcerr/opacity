@@ -1,24 +1,21 @@
 # opacity
-## a tool set window opacity
-# usage
-## commandline:
+## A tool set window opacity
+# Usage
+## Commandline:
 ```
-opacity.exe pid/image name/class name/title alpha
+opacity.exe pid/image name/class name/title alpha --no_gui(optional) --no_info_all_windows(optional)
 ```
-### example:
+### Example:
 ```
-opacity.exe C:\Windows\System32\ApplicationFrameHost.exe
-80
+opacity.exe C:\Windows\System32\ApplicationFrameHost.exe 80
 ```
-## gui
-click opacity.exe to open the gui.
+## GUI
+Run opacity.exe directly to open the GUI.
 # config.txt
 ```
 C:\Windows\System32\ApplicationFrameHost.exe 80
 ```
-# install
-download from [releases](https://github.com/killcerr/opacity/releases).
-
-
-add it to PATH.
+# Install
+Download from [releases](https://github.com/killcerr/opacity/releases).\
+Add it to PATH.
 
