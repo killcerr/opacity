@@ -1,12 +1,16 @@
-#include <unordered_map>
 #pragma comment(lib, "User32.lib")
 #define NOMINMAX
 #include <Windows.h>
+#include <comdef.h>
+
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <string>
+#include <unordered_map>
 #include <vector>
+
 
 #include "GLFW/glfw3.h"
 #include "gl/GL.h"
@@ -32,6 +36,7 @@ std::vector<HWND> get_all_windows() {
     windows.erase(std::unique(windows.begin(), windows.end()), windows.end());
     return windows;
 }
+
 std::wstring get_window_process_image_name(HWND window) {
     DWORD pid = -1;
     GetWindowThreadProcessId(window, &pid);
@@ -114,6 +119,7 @@ void set_opacity(HWND window, BYTE alpha) {
     SetWindowLongA(window, GWL_EXSTYLE, windowLong | WS_EX_LAYERED);
     SetLayeredWindowAttributes(window, 0, alpha, LWA_ALPHA);
 }
+
 BYTE get_opacity(HWND window) {
     COLORREF key;
     BYTE     alpha;
@@ -121,7 +127,21 @@ BYTE get_opacity(HWND window) {
     GetLayeredWindowAttributes(window, &key, &alpha, &falgs);
     return alpha;
 }
+
+std::wstring str2wstr(const std::string& str) {
+    std::wstring res;
+    auto         len = MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.size(), nullptr, 0);
+    if (len < 0) return res;
+    auto buffer = new wchar_t[len + 1];
+    if (!buffer) return res;
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), str.size(), buffer, len);
+    buffer[len] = '\0';
+    res         = buffer;
+    delete[] buffer;
+    return res;
+}
 } // namespace window_utils
+
 std::vector<std::pair<std::wstring, BYTE>> names;
 
 void init_config() {
@@ -139,6 +159,7 @@ void init_config() {
         names.push_back({line, std::stoi(alpha)});
     }
 }
+
 void init_commandline(int argc, wchar_t const* argv[]) {
     std::wcout << "init commandline\n";
     bool is_name = true;
@@ -149,6 +170,7 @@ void init_commandline(int argc, wchar_t const* argv[]) {
         is_name = !is_name;
     }
 }
+
 void apply_opacity() {
     if (names.size() == 0) return;
     for (auto h : window_utils::get_all_windows()) {
@@ -162,30 +184,6 @@ void apply_opacity() {
             }
         }
     }
-}
-void init_imgui();
-
-int wmain(int argc, wchar_t const* argv[]) {
-    for (auto h : window_utils::get_all_windows()) {
-        std::wcout << "class name:" << window_utils::get_window_class_name(h);
-        std::wcout << " ";
-        std::wcout << "title:" << window_utils::get_window_title(h);
-        std::wcout.clear();
-        std::wcout << " ";
-        std::wcout << "image name:" << window_utils::get_window_process_image_name(h);
-        std::wcout << " ";
-        std::wcout << "pid:" << window_utils::get_window_pid(h);
-        std::wcout << " ";
-        std::wcout << "alpha:" << window_utils::get_opacity(h);
-        std::wcout << "\n";
-    }
-
-    init_config();
-    init_commandline(argc, argv);
-    apply_opacity();
-    opt_helper::Parser parser{argc, argv};
-    if (!parser.exist<CTC::CTStr{L"--no_gui"}>()) init_imgui();
-    return 0;
 }
 
 void init_imgui() {
@@ -215,13 +213,49 @@ void init_imgui() {
             glfwGetWindowSize(window, &width, &height);
             ImGui::SetNextWindowSize({(float)width, (float)height});
             ImGui::SetNextWindowPos({0, 0});
+            ImGui::SetNextWindowCollapsed(false);
             ImGui::Begin("All Windows");
+            static char* search = new char[1024](0);
+            ImGui::InputText("search", search, 1024);
+            ImGui::SameLine();
+            static bool useRegex = false;
+            ImGui::Checkbox("use regex", &useRegex);
+            bool regexErrorShowed = false;
+            auto match            = [&](auto h) {
+                try {
+                    if (useRegex) {
+                        std::wregex reg((std::wstring(window_utils::str2wstr(search))));
+                        if (std::regex_match((window_utils::get_window_class_name(h)), reg)) return true;
+                        if (std::regex_match((window_utils::get_window_process_image_name(h)), reg)) return true;
+                        std::wstringstream wstream;
+                        wstream << window_utils::get_window_title(h);
+                        if (std::regex_match(wstream.str(), reg)) return true;
+                    } else {
+                        auto        s = window_utils::str2wstr(search);
+                        std::wregex reg((L"[\\w\\W]*" + std::wstring(window_utils::str2wstr(search)) + L"[\\w\\W]*"));
+                        if (std::regex_match((window_utils::get_window_class_name(h)), reg)) return true;
+                        if (std::regex_match((window_utils::get_window_process_image_name(h)), reg)) return true;
+                        std::wstringstream wstream;
+                        wstream << window_utils::get_window_title(h);
+                        if (std::regex_match(wstream.str(), reg)) return true;
+                    }
+                    if (std::to_string(window_utils::get_window_pid(h)) == search) return true;
+                } catch (std::regex_error& e) {
+                    if (useRegex) {
+                        if (!regexErrorShowed) {
+                            ImGui::TextColored(ImVec4{1.0, 0, 0, 1}, "regex error");
+                            regexErrorShowed = true;
+                        }
+                        return true;
+                    }
+                } catch (...) {}
 
+                return false;
+            };
             for (auto h : window_utils::get_all_windows()) {
+                if (search[0] != '\0' && !match(h)) continue;
                 ImGui::Text("class name:%ws", window_utils::get_window_class_name(h).c_str());
                 ImGui::SameLine();
-                // ImGui::Text("title:%ws", window_utils::get_window_title(h).c_str());
-                // ImGui::SameLine();
                 ImGui::Text("image name:%ws", window_utils::get_window_process_image_name(h).c_str());
                 ImGui::SameLine();
                 ImGui::Text("pid:%lu", window_utils::get_window_pid(h));
@@ -253,4 +287,27 @@ void init_imgui() {
 
         glfwSwapBuffers(window);
     }
+}
+
+int wmain(int argc, wchar_t const* argv[]) {
+    for (auto h : window_utils::get_all_windows()) {
+        std::wcout << "class name:" << window_utils::get_window_class_name(h);
+        std::wcout << " ";
+        std::wcout << "title:" << window_utils::get_window_title(h);
+        std::wcout.clear();
+        std::wcout << " ";
+        std::wcout << "image name:" << window_utils::get_window_process_image_name(h);
+        std::wcout << " ";
+        std::wcout << "pid:" << window_utils::get_window_pid(h);
+        std::wcout << " ";
+        std::wcout << "alpha:" << window_utils::get_opacity(h);
+        std::wcout << "\n";
+    }
+
+    init_config();
+    init_commandline(argc, argv);
+    apply_opacity();
+    opt_helper::Parser parser{argc, argv};
+    if (!parser.exist<CTC::CTStr{L"--no_gui"}>()) init_imgui();
+    return 0;
 }
