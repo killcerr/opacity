@@ -192,7 +192,7 @@ void init_imgui() {
     const char* glsl_ver = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    GLFWwindow* window = glfwCreateWindow(1028, 720, "opacity", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(1024, 720, "opacity", nullptr, nullptr);
     if (!window) std::terminate();
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
@@ -214,7 +214,11 @@ void init_imgui() {
             ImGui::SetNextWindowSize({(float)width, (float)height});
             ImGui::SetNextWindowPos({0, 0});
             ImGui::SetNextWindowCollapsed(false);
-            ImGui::Begin("All Windows");
+            ImGui::Begin(
+                "All Windows",
+                nullptr,
+                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar
+            );
             static char* search = new char[1024](0);
             ImGui::InputText("search", search, 1024);
             ImGui::SameLine();
