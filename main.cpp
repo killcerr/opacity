@@ -86,7 +86,7 @@ std::wstring get_window_title(HWND window) {
     title.resize(len);
     len = GetWindowTextW(window, title.data(), len);
     if (len == 0) return L"";
-    title.resize(std::max(len, 0));
+    title.resize(std::max(len + 1, 0));
     if (len <= 1024) return title;
     else {
         GetWindowTextW(window, title.data(), len);
@@ -115,13 +115,30 @@ DWORD get_window_pid(HWND window) {
     return pid;
 }
 
-void set_opacity(HWND window, BYTE alpha) {
+
+bool set_style(HWND window) {
+    static std::unordered_map<HWND, bool> windows;
+    if (windows.contains(window)) {
+        return windows[window];
+    }
     LONG windowLong = GetWindowLongA(window, GWL_EXSTYLE);
+    if (windowLong & CS_CLASSDC || windowLong & CS_OWNDC) {
+        windows[window] = false;
+        return false;
+    }
     SetWindowLongA(window, GWL_EXSTYLE, windowLong | WS_EX_LAYERED);
+    windows[window] = true;
+    return true;
+}
+
+void set_opacity(HWND window, BYTE alpha) {
+    if (!set_style(window)) return;
     SetLayeredWindowAttributes(window, 0, alpha, LWA_ALPHA);
+    return;
 }
 
 BYTE get_opacity(HWND window) {
+    if (!set_style(window)) return 255;
     COLORREF key;
     BYTE     alpha;
     DWORD    flags;
