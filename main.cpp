@@ -86,6 +86,7 @@ std::wstring get_window_title(HWND window) {
     title.resize(len);
     len = GetWindowTextW(window, title.data(), len);
     if (len == 0) return L"";
+    title[len] = '\0';
     title.resize(std::max(len + 1, 0));
     if (len <= 1024) return title;
     else {
@@ -138,7 +139,7 @@ void set_opacity(HWND window, BYTE alpha) {
 }
 
 BYTE get_opacity(HWND window) {
-    if (!set_style(window)) return 255;
+    // if (!set_style(window)) return 255;
     COLORREF key;
     BYTE     alpha;
     DWORD    flags;
